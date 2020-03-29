@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">ServiceDemo</string>
+    <string name="channel_name">Timer</string>
+    <string name="channel_description">Create Timer</string>
+</resources>
