@@ -22,6 +22,7 @@ const val ACTION_TIMER_RESUME = "com.sample.servicedemo.TIMER_RESUME"
 
 const val PREF_KEY_TIMER_DURATION = "timer_duration"
 const val PREF_KEY_TIMER_CREATED = "timer_created"
+const val PREF_KEY_TIMER_RUNNING = "timer_running"
 
 class TimerService : Service() {
 
@@ -77,35 +78,49 @@ class TimerService : Service() {
     }
 
     private fun handleResumeTimer() {
-        val timerCreationTime = getPreferenceValue(PREF_KEY_TIMER_CREATED)
-        val timerDuration = getPreferenceValue(PREF_KEY_TIMER_DURATION)
-        val timeInSeconds = (timerDuration - (System.currentTimeMillis() - timerCreationTime)) / 1000
-        createNotification(timeInSeconds)
-        startTimer(timeInSeconds)
+        if (getPreferenceValueBoolean(PREF_KEY_TIMER_RUNNING)) {
+            val timerCreationTime = getPreferenceValueLong(PREF_KEY_TIMER_CREATED)
+            val timerDuration = getPreferenceValueLong(PREF_KEY_TIMER_DURATION)
+            val timeInSeconds =
+                (timerDuration - (System.currentTimeMillis() - timerCreationTime)) / 1000
+            createNotification(timeInSeconds)
+            startTimer(timeInSeconds)
+        } else {
+            stopSelf()
+        }
     }
 
     private fun handleCancelTimer() {
         timer.cancel()
+        saveTimerValue(-1, false)
         stopForeground(true)
         stopSelf()
     }
 
     private fun handleStartTimer(timeInSeconds: Long) {
-        saveTimerValue(timeInSeconds)
+        saveTimerValue(timeInSeconds, true)
         createNotification(timeInSeconds)
         startTimer(timeInSeconds)
     }
 
-    private fun getPreferenceValue(key: String): Long {
+    private fun getPreferenceValueLong(key: String): Long {
         return getSharedPreferences(baseContext.packageName, Context.MODE_PRIVATE).getLong(key, -1L)
     }
 
-    private fun saveTimerValue(timeInSeconds: Long) {
+    private fun getPreferenceValueBoolean(key: String): Boolean {
+        return getSharedPreferences(baseContext.packageName, Context.MODE_PRIVATE).getBoolean(
+            key,
+            false
+        )
+    }
+
+    private fun saveTimerValue(timeInSeconds: Long, isTimerRunning: Boolean) {
         val prefs = baseContext.getSharedPreferences(baseContext.packageName, Context.MODE_PRIVATE)
             ?: return
         prefs.edit().apply {
             putLong(PREF_KEY_TIMER_CREATED, System.currentTimeMillis())
             putLong(PREF_KEY_TIMER_DURATION, timeInSeconds * 1000)
+            putBoolean(PREF_KEY_TIMER_RUNNING, isTimerRunning)
             apply()
         }
     }
@@ -114,6 +129,7 @@ class TimerService : Service() {
         timer = object : CountDownTimer(timeInSeconds * 1000, 1000) {
             override fun onFinish() {
                 isTimerRunning = false
+                saveTimerValue(-1, false)
                 stopForeground(true)
                 Intent(this@TimerService, ResultActivity::class.java).apply {
                     flags = Intent.FLAG_ACTIVITY_NEW_TASK
